@@ -1,0 +1,100 @@
+{
+  "name": "ai-firewall",
+  "displayName": "AI Firewall",
+  "description": "AI-powered code security firewall for VS Code",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "security",
+    "ai",
+    "firewall",
+    "code-analysis"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ai-firewall.analyzeFile",
+        "title": "AI Firewall: Analyze Current File"
+      },
+      {
+        "command": "ai-firewall.analyzeWorkspace",
+        "title": "AI Firewall: Analyze Workspace"
+      },
+      {
+        "command": "ai-firewall.toggleFirewall",
+        "title": "AI Firewall: Toggle Protection"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "ai-firewall.analyzeFile",
+          "group": "ai-firewall",
+          "when": "editorTextFocus"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "ai-firewall.analyzeFile",
+          "group": "ai-firewall",
+          "when": "resourceExtname == .py || resourceExtname == .js || resourceExtname == .ts"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "AI Firewall",
+      "properties": {
+        "aiFirewall.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable AI Firewall protection"
+        },
+        "aiFirewall.apiEndpoint": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "AI Firewall API endpoint"
+        },
+        "aiFirewall.autoAnalyze": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically analyze files on save"
+        },
+        "aiFirewall.severityLevel": {
+          "type": "string",
+          "enum": ["LOW", "MEDIUM", "HIGH"],
+          "default": "MEDIUM",
+          "description": "Minimum severity level to show warnings"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "eslint": "^8.28.0",
+    "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+} 
