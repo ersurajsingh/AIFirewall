@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import uvicorn
+from security_analyzer import AICodeSecurityAnalyzer, analyze_ai_code
 
 app = FastAPI(title="AI Firewall", description="AI-powered code security firewall", version="1.0.0")
 
@@ -19,6 +20,12 @@ class CodeAnalysisRequest(BaseModel):
     code: str
     language: str
     file_path: Optional[str] = None
+
+class AICodeAnalysisRequest(BaseModel):
+    code: str
+    language: str = "python"
+    source: Optional[str] = "ai_generated"  # Track if code is AI-generated
+    context: Optional[str] = None  # Additional context about the code
 
 class SecurityIssue(BaseModel):
     severity: str
@@ -81,6 +88,27 @@ async def analyze_code(request: CodeAnalysisRequest):
         confidence_score=confidence_score
     )
 
+@app.post("/analyze-ai-code")
+async def analyze_ai_generated_code(request: AICodeAnalysisRequest):
+    """
+    Advanced analysis specifically for AI-generated code suggestions.
+    Uses AST parsing and sophisticated pattern matching for security analysis.
+    """
+    try:
+        # Use the advanced security analyzer
+        analyzer = AICodeSecurityAnalyzer()
+        analysis_result = analyzer.analyze_code(request.code, request.language)
+        
+        # Add metadata about the analysis
+        analysis_result["source"] = request.source
+        analysis_result["context"] = request.context
+        analysis_result["analyzer_version"] = "2.0"
+        
+        return analysis_result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
 @app.post("/batch-analyze")
 async def batch_analyze(requests: List[CodeAnalysisRequest]):
     """
@@ -91,6 +119,30 @@ async def batch_analyze(requests: List[CodeAnalysisRequest]):
         analysis = await analyze_code(req)
         results.append(analysis)
     return {"results": results}
+
+@app.post("/batch-analyze-ai-code") 
+async def batch_analyze_ai_code(requests: List[AICodeAnalysisRequest]):
+    """
+    Batch analysis for multiple AI-generated code snippets
+    """
+    try:
+        analyzer = AICodeSecurityAnalyzer()
+        results = []
+        
+        for req in requests:
+            analysis_result = analyzer.analyze_code(req.code, req.language)
+            analysis_result["source"] = req.source
+            analysis_result["context"] = req.context
+            results.append(analysis_result)
+        
+        return {
+            "batch_results": results,
+            "total_analyzed": len(results),
+            "analyzer_version": "2.0"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch analysis failed: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000) 
