@@ -20,8 +20,18 @@
     "onStartupFinished"
   ],
   "main": "./out/extension.js",
-  "contributes": {
-    "commands": [
+  	"contributes": {
+		"views": {
+			"explorer": [
+				{
+					"type": "webview",
+					"id": "aiFirewall.webview",
+					"name": "AI Firewall",
+					"when": "workspaceFolderCount > 0"
+				}
+			]
+		},
+		"commands": [
       {
         "command": "ai-firewall.analyzeFile",
         "title": "AI Firewall: Analyze Current File"

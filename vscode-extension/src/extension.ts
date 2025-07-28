@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
+import { AIFirewallWebviewProvider } from './webview';
 
 interface SecurityIssue {
     severity: string;
