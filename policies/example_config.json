@@ -1,0 +1,86 @@
+{
+  "global_settings": {
+    "strict_mode": false,
+    "log_violations": true,
+    "auto_block_critical": true,
+    "notification_webhook": null,
+    "default_action": "warn",
+    "environment": "development"
+  },
+  "policies": {
+    "prod_env_modification": {
+      "name": "Production Environment Modification",
+      "description": "Prevents modification of production environment variables",
+      "severity": "critical",
+      "action": "block",
+      "enabled": true,
+      "category": "environment",
+      "tags": ["production", "security", "environment"],
+      "forbidden_env_vars": [
+        "PROD_*",
+        "PRODUCTION_*",
+        "*_PROD",
+        "*_PRODUCTION"
+      ],
+      "patterns": [
+        "os\\.environ\\[['\"]PROD",
+        "export.*PROD"
+      ],
+      "allowed_exceptions": ["PROD_LOG_LEVEL"],
+      "context_conditions": {
+        "environment": ["production", "staging"]
+      }
+    },
+    "dangerous_libraries": {
+      "name": "Dangerous Library Usage",
+      "description": "Prevents usage of potentially dangerous libraries",
+      "severity": "high",
+      "action": "warn",
+      "enabled": true,
+      "category": "imports",
+      "tags": ["imports", "security"],
+      "forbidden_imports": [
+        "pickle",
+        "marshal",
+        "eval"
+      ],
+      "patterns": [
+        "import\\s+pickle",
+        "subprocess\\.call.*shell=True"
+      ],
+      "suggestion": "Use safer alternatives like json for serialization"
+    },
+    "secret_exposure": {
+      "name": "API Key and Secret Exposure",
+      "description": "Detects potential API keys and secrets in code",
+      "severity": "critical",
+      "action": "block",
+      "enabled": true,
+      "category": "secrets",
+      "tags": ["secrets", "api-keys"],
+      "patterns": [
+        "api_key\\s*=\\s*['\"][A-Za-z0-9]{20,}['\"]",
+        "sk-[A-Za-z0-9]{20,}",
+        "ghp_[A-Za-z0-9]{36}"
+      ],
+      "suggestion": "Use environment variables or secure key management services"
+    },
+    "file_operations": {
+      "name": "Destructive File Operations",
+      "description": "Controls destructive file system operations",
+      "severity": "medium",
+      "action": "warn",
+      "enabled": true,
+      "category": "filesystem",
+      "tags": ["filesystem", "destructive"],
+      "forbidden_file_operations": [
+        "rm -rf",
+        "rmdir"
+      ],
+      "patterns": [
+        "os\\.remove\\(",
+        "shutil\\.rmtree\\("
+      ]
+    }
+  }
+} 

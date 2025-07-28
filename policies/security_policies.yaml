@@ -1,0 +1,285 @@
+# AI Firewall Security Policies Configuration
+# This file defines custom security rules for code analysis
+
+global_settings:
+  strict_mode: false
+  log_violations: true
+  auto_block_critical: true
+  notification_webhook: null
+  default_action: "warn"
+  environment: "development"  # development, staging, production
+
+policies:
+  # Production Environment Protection
+  prod_env_modification:
+    name: "Production Environment Modification"
+    description: "Prevents modification of production environment variables"
+    severity: "critical"
+    action: "block"
+    enabled: true
+    category: "environment"
+    tags: ["production", "security", "environment"]
+    forbidden_env_vars:
+      - "PROD_*"
+      - "PRODUCTION_*"
+      - "*_PROD"
+      - "*_PRODUCTION"
+      - "DATABASE_URL_PROD"
+      - "API_KEY_PROD"
+    patterns:
+      - "os\\.environ\\[['\"]PROD"
+      - "os\\.environ\\[['\"]*.*PROD.*['\"]\\]"
+      - "setenv.*PROD"
+      - "export.*PROD"
+      - "process\\.env\\.PROD"
+    allowed_exceptions:
+      - "PROD_LOG_LEVEL"  # Allow non-sensitive prod vars
+    context_conditions:
+      environment: ["production", "staging"]
+      file_patterns: ["*.py", "*.js", "*.ts"]
+
+  # Sensitive Directory Access
+  sensitive_directory_access:
+    name: "Sensitive Directory Access"
+    description: "Prevents access to sensitive system directories"
+    severity: "high"
+    action: "warn"
+    enabled: true
+    category: "filesystem"
+    tags: ["filesystem", "security", "system"]
+    forbidden_directories:
+      - "/etc/*"
+      - "/sys/*"
+      - "/proc/*"
+      - "/root/*"
+      - "/var/log/*"
+      - "C:\\Windows\\*"
+      - "C:\\Program Files\\*"
+    patterns:
+      - "open\\(['\"]/(etc|sys|proc|root)/"
+      - "Path\\(['\"]/(etc|sys|proc|root)/"
+      - "pathlib.*\\(['\"]/(etc|sys|proc|root)/"
+    allowed_exceptions:
+      - "/etc/hosts"  # Common read-only access
+      - "/proc/cpuinfo"
+
+  # Dangerous Library Usage
+  dangerous_libraries:
+    name: "Dangerous Library Usage"
+    description: "Prevents usage of potentially dangerous libraries"
+    severity: "high"
+    action: "warn"
+    enabled: true
+    category: "imports"
+    tags: ["imports", "security", "serialization"]
+    forbidden_imports:
+      - "pickle"
+      - "dill"
+      - "marshal"
+      - "shelve"
+      - "eval"
+      - "exec"
+    patterns:
+      - "import\\s+pickle"
+      - "from\\s+pickle\\s+import"
+      - "import\\s+marshal"
+      - "subprocess\\.call.*shell=True"
+      - "__import__\\("
+    suggestion: "Use safer alternatives like json for serialization"
+
+  # Database Security
+  database_credential_exposure:
+    name: "Database Credential Exposure"
+    description: "Prevents hardcoded database credentials and connection strings"
+    severity: "critical"
+    action: "block"
+    enabled: true
+    category: "credentials"
+    tags: ["database", "credentials", "security"]
+    patterns:
+      - "password\\s*=\\s*['\"]\\w+['\"]"
+      - "passwd\\s*=\\s*['\"]\\w+['\"]"
+      - "mysql://.*:.*@"
+      - "postgresql://.*:.*@"
+      - "mongodb://.*:.*@"
+      - "redis://.*:.*@"
+      - "DATABASE_URL\\s*=\\s*['\"].*://.*:.*@"
+    allowed_exceptions:
+      - "password=\"\""  # Empty passwords for local dev
+      - "password=None"
+    suggestion: "Use environment variables or secure credential management"
+
+  # File System Modifications
+  destructive_file_operations:
+    name: "Destructive File Operations"
+    description: "Controls destructive file system operations"
+    severity: "medium"
+    action: "warn"
+    enabled: true
+    category: "filesystem"
+    tags: ["filesystem", "destructive", "safety"]
+    forbidden_file_operations:
+      - "rm -rf"
+      - "rmdir"
+      - "del /f"
+      - "format"
+      - "mkfs"
+    patterns:
+      - "os\\.remove\\("
+      - "os\\.rmdir\\("
+      - "shutil\\.rmtree\\("
+      - "pathlib.*\\.unlink\\("
+      - "subprocess.*rm\\s+-rf"
+      - "subprocess.*rmdir"
+    context_conditions:
+      file_patterns: ["*.py", "*.sh", "*.bat"]
+
+  # Network Security
+  external_network_requests:
+    name: "External Network Requests"
+    description: "Controls and logs external network access"
+    severity: "medium"
+    action: "log"
+    enabled: true
+    category: "network"
+    tags: ["network", "external", "monitoring"]
+    patterns:
+      - "requests\\.(get|post|put|delete|patch)"
+      - "urllib\\.request"
+      - "http\\.client"
+      - "socket\\.connect"
+      - "fetch\\("
+    allowed_exceptions:
+      - "localhost"
+      - "127.0.0.1"
+      - "*.internal.com"
+      - "*.local"
+    suggestion: "Ensure external requests are necessary and secure"
+
+  # Cryptographic Issues
+  weak_cryptography:
+    name: "Weak Cryptographic Practices"
+    description: "Detects weak or deprecated cryptographic practices"
+    severity: "high"
+    action: "warn"
+    enabled: true
+    category: "cryptography"
+    tags: ["crypto", "security", "encryption"]
+    patterns:
+      - "hashlib\\.md5"
+      - "hashlib\\.sha1"
+      - "Crypto\\.Cipher\\.DES"
+      - "ssl\\.PROTOCOL_TLS"
+      - "random\\.random\\(\\).*password"
+    forbidden_functions:
+      - "hashlib.md5"
+      - "hashlib.sha1"
+      - "crypt.crypt"
+    suggestion: "Use SHA-256 or stronger hashing algorithms"
+
+  # Code Injection Risks
+  code_injection:
+    name: "Code Injection Risks"
+    description: "Prevents dynamic code execution that could lead to injection"
+    severity: "critical"
+    action: "block"
+    enabled: true
+    category: "injection"
+    tags: ["injection", "security", "dynamic-code"]
+    forbidden_functions:
+      - "eval"
+      - "exec"
+      - "compile"
+      - "__import__"
+    patterns:
+      - "eval\\s*\\("
+      - "exec\\s*\\("
+      - "compile\\s*\\("
+      - "__import__\\s*\\("
+      - "getattr\\(.*,\\s*input\\("
+    suggestion: "Use safer alternatives like ast.literal_eval for data parsing"
+
+  # API Key and Secret Exposure
+  secret_exposure:
+    name: "API Key and Secret Exposure"
+    description: "Detects potential API keys and secrets in code"
+    severity: "critical"
+    action: "block"
+    enabled: true
+    category: "secrets"
+    tags: ["secrets", "api-keys", "credentials"]
+    patterns:
+      - "api_key\\s*=\\s*['\"][A-Za-z0-9]{20,}['\"]"
+      - "secret_key\\s*=\\s*['\"][A-Za-z0-9]{20,}['\"]"
+      - "token\\s*=\\s*['\"][A-Za-z0-9]{20,}['\"]"
+             - "sk-[A-Za-z0-9]{20,}"  # OpenAI API keys
+       - "ghp_[A-Za-z0-9]{36}"  # GitHub tokens  
+       - "xoxb-[A-Za-z0-9-]{50,}"  # Slack tokens
+    suggestion: "Use environment variables or secure key management services"
+
+  # Development-Only Libraries
+  dev_only_libraries:
+    name: "Development-Only Libraries"
+    description: "Prevents usage of development-only libraries in production"
+    severity: "medium"
+    action: "warn"
+    enabled: true
+    category: "imports"
+    tags: ["development", "production", "libraries"]
+    forbidden_imports:
+      - "debugpy"
+      - "pdb"
+      - "ipdb"
+      - "pudb"
+      - "debug"
+    context_conditions:
+      environment: ["production", "staging"]
+    suggestion: "Remove debug libraries before production deployment"
+
+  # Mass Data Operations
+  bulk_operations:
+    name: "Bulk Data Operations"
+    description: "Controls large-scale data operations that could impact performance"
+    severity: "medium"
+    action: "warn"
+    enabled: true
+    category: "performance"
+    tags: ["performance", "bulk-operations", "data"]
+    patterns:
+      - "for.*range\\(\\s*[1-9]\\d{3,}\\s*\\)"  # Loops over 1000 iterations
+      - "executemany\\("
+      - "bulk_create\\("
+      - "bulk_update\\("
+    suggestion: "Consider batch processing or pagination for large operations"
+
+  # Temporary File Security
+  temp_file_security:
+    name: "Temporary File Security"
+    description: "Ensures secure handling of temporary files"
+    severity: "medium"
+    action: "warn"
+    enabled: true
+    category: "filesystem"
+    tags: ["temp-files", "security", "cleanup"]
+    patterns:
+      - "tempfile\\.mktemp\\("
+      - "open\\(['\"]/(tmp|temp)/"
+      - "/tmp/.*['\"]"
+    forbidden_functions:
+      - "tempfile.mktemp"
+    suggestion: "Use tempfile.NamedTemporaryFile() for secure temporary files"
+
+  # Logging Security
+  log_injection:
+    name: "Log Injection Prevention"
+    description: "Prevents log injection through user input"
+    severity: "medium"
+    action: "warn"
+    enabled: true
+    category: "logging"
+    tags: ["logging", "injection", "user-input"]
+    patterns:
+      - "logger\\.(info|debug|warning|error)\\(.*\\+.*input"
+      - "logging\\.(info|debug|warning|error)\\(.*\\+.*request"
+      - "print\\(.*\\+.*input\\("
+    suggestion: "Sanitize user input before logging or use parameterized logging" 
