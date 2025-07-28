@@ -2,8 +2,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
+from datetime import datetime
 import uvicorn
 from security_analyzer import AICodeSecurityAnalyzer, analyze_ai_code
+from code_explainer import PythonCodeExplainer, explain_python_code_async, LLMProvider
 
 app = FastAPI(title="AI Firewall", description="AI-powered code security firewall", version="1.0.0")
 
@@ -26,6 +28,13 @@ class AICodeAnalysisRequest(BaseModel):
     language: str = "python"
     source: Optional[str] = "ai_generated"  # Track if code is AI-generated
     context: Optional[str] = None  # Additional context about the code
+
+class CodeExplanationRequest(BaseModel):
+    code: str
+    provider: str = "openai"  # "openai" or "anthropic"
+    detail_level: str = "intermediate"  # "beginner", "intermediate", "advanced"
+    target_audience: str = "developers"  # "beginners", "developers", "students", "experts"
+    api_key: Optional[str] = None  # Optional API key override
 
 class SecurityIssue(BaseModel):
     severity: str
@@ -142,7 +151,107 @@ async def batch_analyze_ai_code(requests: List[AICodeAnalysisRequest]):
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Batch analysis failed: {str(e)}")
+                 raise HTTPException(status_code=500, detail=f"Batch analysis failed: {str(e)}")
+
+@app.post("/explain-code")
+async def explain_python_code_endpoint(request: CodeExplanationRequest):
+    """
+    Explain Python code line-by-line using OpenAI or Anthropic LLMs.
+    Returns detailed explanations in markdown format.
+    """
+    try:
+        # Validate provider
+        if request.provider.lower() not in ["openai", "anthropic"]:
+            raise HTTPException(status_code=400, detail="Provider must be 'openai' or 'anthropic'")
+        
+        # Validate detail level
+        if request.detail_level not in ["beginner", "intermediate", "advanced"]:
+            raise HTTPException(status_code=400, detail="Detail level must be 'beginner', 'intermediate', or 'advanced'")
+        
+        # Generate explanation
+        explanation_markdown = await explain_python_code_async(
+            code=request.code,
+            provider=request.provider,
+            detail_level=request.detail_level,
+            target_audience=request.target_audience,
+            api_key=request.api_key
+        )
+        
+        return {
+            "explanation": explanation_markdown,
+            "provider_used": request.provider,
+            "detail_level": request.detail_level,
+            "target_audience": request.target_audience,
+            "timestamp": datetime.utcnow().isoformat() + 'Z',
+            "status": "success"
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Code explanation failed: {str(e)}")
+
+@app.post("/explain-code-simple") 
+async def explain_code_simple(request: dict):
+    """
+    Simple endpoint for quick code explanations using default settings.
+    Expects {"code": "python code here"} and returns markdown explanation.
+    """
+    try:
+        code = request.get("code", "")
+        if not code:
+            raise HTTPException(status_code=400, detail="Code field is required")
+            
+        explanation = await explain_python_code_async(
+            code=code,
+            provider="openai",
+            detail_level="intermediate",
+            target_audience="developers"
+        )
+        
+        return {"explanation": explanation}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Code explanation failed: {str(e)}")
+
+@app.get("/explain-demo")
+async def explanation_demo():
+    """
+    Demo endpoint showing code explanation capabilities with sample code
+    """
+    sample_code = '''
+def fibonacci(n):
+    """Calculate fibonacci number recursively"""
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+# Calculate first 10 fibonacci numbers
+for i in range(10):
+    print(f"fib({i}) = {fibonacci(i)}")
+'''
+    
+    try:
+        explanation = await explain_python_code_async(
+            code=sample_code,
+            provider="openai", 
+            detail_level="beginner",
+            target_audience="students"
+        )
+        
+        return {
+            "demo_code": sample_code,
+            "explanation": explanation,
+            "message": "This is a demo of the code explanation feature"
+        }
+        
+    except Exception as e:
+        return {
+            "demo_code": sample_code,
+            "explanation": "Demo explanation not available - API key may be missing",
+            "error": str(e),
+            "message": "Set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable to use this feature"
+        }
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000) 
